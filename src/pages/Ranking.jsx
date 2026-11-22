@@ -3,6 +3,7 @@ import { BarChart3, Users, CalendarDays, Target, TrendingUp, Search } from 'luci
 import { useData } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { Avatar, StatCard } from '../components/ui'
+import { jornadaInfo } from '../lib/utils'
 
 const MEDALS = ['🥇', '🥈', '🥉']
 
@@ -15,7 +16,7 @@ export default function Ranking() {
 
   const jornadas = [...new Set(matches.map((m) => m.jornada))].sort((a, b) => a - b)
   const doneJ = jornadas.filter((j) => matches.filter((m) => m.jornada === j).every((m) => m.status === 'finished')).length
-  const total = content?.total_jornadas || jornadas.length
+  const total = Math.max(content?.total_jornadas || 0, jornadas.length)
   const pph = content?.points_per_hit ?? 3
 
   const rows = useMemo(() => {
@@ -56,7 +57,7 @@ export default function Ranking() {
           <div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row">
             <select className="input md:w-48" value={jFilter} onChange={(e) => setJFilter(e.target.value)}>
               <option value="all">General</option>
-              {jornadas.map((j) => <option key={j} value={j}>Jornada {j}</option>)}
+              {jornadas.map((j) => <option key={j} value={j}>{jornadaInfo(j, matches).label}</option>)}
             </select>
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -98,7 +99,7 @@ export default function Ranking() {
                 <div key={i} className="flex flex-1 flex-col items-center gap-1">
                   <span className="text-[9px] text-muted-foreground">{v || ''}</span>
                   <div className="w-full rounded-t bg-primary/80" style={{ height: `${(v / maxHits) * 90}px`, minHeight: 2 }} />
-                  <span className="text-[8px] text-muted-foreground">{jornadas[i]}</span>
+                  <span className="text-[8px] text-muted-foreground">{jornadaInfo(jornadas[i], matches).tiny}</span>
                 </div>
               ))}
             </div>

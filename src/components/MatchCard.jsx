@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { BarChart3, Check, X as XIcon } from 'lucide-react'
 import { useData } from '../lib/data'
-import { fmtShort, isOpen, matchState, RESULT_LABEL, RESULT_SHORT } from '../lib/utils'
+import { firstLeg, fmtShort, isOpen, matchState, RESULT_LABEL, RESULT_SHORT, STAGES } from '../lib/utils'
 import { TeamLogo, Modal } from './ui'
 import { supabase } from '../lib/supabase'
 
@@ -12,12 +12,13 @@ const STATE_CHIP = {
 }
 
 export default function MatchCard({ match, now }) {
-  const { predByMatch, predict } = useData()
+  const { predByMatch, predict, matches } = useData()
   const pred = predByMatch[match.id]
   const st = matchState(match, now)
   const open = isOpen(match, now)
   const [stats, setStats] = useState(null)
   const knockout = match.stage !== 'groups'
+  const ida = knockout ? firstLeg(match, matches) : null
 
   const correct = st === 'finished' && pred && pred.predicted_result === match.official_result
 
@@ -32,6 +33,12 @@ export default function MatchCard({ match, now }) {
         <span className="text-[11px] font-semibold uppercase text-muted-foreground">{fmtShort(match.kickoff)}</span>
         <span className={`chip ${STATE_CHIP[st][1]}`}>{STATE_CHIP[st][0]}</span>
       </div>
+      {knockout && (
+        <p className="-mt-1 mb-3 text-center text-[11px] font-bold uppercase text-primary">
+          {STAGES[match.stage]} · {ida ? 'Vuelta' : 'Ida'}
+          {ida?.status === 'finished' && <span className="ml-1 font-semibold normal-case text-muted-foreground">· Ida: {ida.local_team_short || ida.local_team} {ida.local_score}-{ida.away_score} {ida.away_team_short || ida.away_team}</span>}
+        </p>
+      )}
 
       <div className="flex items-center justify-between gap-2">
         <Team name={match.local_team} flag={match.local_team_flag} />
@@ -46,11 +53,10 @@ export default function MatchCard({ match, now }) {
       {open ? (
         <div className="mt-4 grid grid-cols-3 gap-2">
           {['local', 'draw', 'away'].map((r) => {
-            const disabled = knockout && r === 'draw'
             const sel = pred?.predicted_result === r
             return (
-              <button key={r} disabled={disabled} onClick={() => predict(match, r)}
-                className={`rounded-xl border py-2.5 text-center transition ${sel ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-white/5 hover:border-primary/60'} disabled:opacity-30`}>
+              <button key={r} onClick={() => predict(match, r)}
+                className={`rounded-xl border py-2.5 text-center transition ${sel ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-white/5 hover:border-primary/60'}`}>
                 <span className="block text-base font-black">{RESULT_SHORT[r]}</span>
                 <span className="block text-[10px] font-semibold opacity-80">{RESULT_LABEL[r]}</span>
               </button>

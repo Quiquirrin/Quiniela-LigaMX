@@ -15,7 +15,9 @@ App de quiniela en React + Vite + Tailwind, con base de datos y login en Supabas
 ## Reglas (iguales a la versión anterior)
 - 3 puntos por acierto (configurable en Admin › Contenido).
 - Cada partido se cierra a la hora de inicio; la base de datos lo hace cumplir, no solo la pantalla.
-- En fases de eliminación no se permite pronosticar empate.
+- Liguilla (Cuartos, Semis y Final) de ida y vuelta: cada partido se pronostica L/E/V a 90 minutos (sí se permite empate), 3 puntos por acierto.
+  Admin › Partidos › "Serie de liguilla" crea la ida (casa del peor posicionado) y la vuelta (casa del mejor posicionado)
+  en las jornadas 18-19 (Cuartos), 20-21 (Semis) y 22-23 (Final).
 - Los pronósticos de los demás solo se ven cuando el partido ya empezó.
 
 ## Usuarios migrados

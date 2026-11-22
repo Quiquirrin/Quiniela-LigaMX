@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Settings, Plus, Pencil, Trash2, Save, ListOrdered, Shield, Users, FileText, Zap } from 'lucide-react'
 import { useData } from '../lib/data'
 import { supabase, SUPABASE_URL } from '../lib/supabase'
-import { currentJornada, fmtShort, resultFromScore, RESULT_LABEL, STAGES } from '../lib/utils'
+import { currentJornada, fmtShort, jornadaLabel, LIGUILLA_JORNADAS, resultFromScore, RESULT_LABEL, STAGES } from '../lib/utils'
 import { Modal, TeamLogo, Avatar } from '../components/ui'
 
 const TABS = [['results', 'Resultados', Zap], ['matches', 'Partidos', ListOrdered], ['teams', 'Equipos', Shield], ['users', 'Usuarios', Users], ['content', 'Contenido', FileText]]
@@ -39,7 +39,7 @@ function QuickResults() {
     <div className="space-y-3">
       <div className="flex items-center gap-3">
         <label className="text-xs font-bold text-muted-foreground">Jornada</label>
-        <select className="input w-40" value={j} onChange={(e) => setJ(+e.target.value)}>{js.map((x) => <option key={x} value={x}>Jornada {x}</option>)}</select>
+        <select className="input w-48" value={j} onChange={(e) => setJ(+e.target.value)}>{js.map((x) => <option key={x} value={x}>{jornadaLabel(x, matches)}</option>)}</select>
       </div>
       <p className="text-xs text-muted-foreground">Escribe el marcador y guarda: el partido queda como finalizado y los puntos se recalculan solos.</p>
       <div className="grid gap-3 md:grid-cols-2">
@@ -97,6 +97,7 @@ function MatchesAdmin() {
   const js = [...new Set(matches.map((m) => m.jornada))].sort((a, b) => a - b)
   const [j, setJ] = useState('all')
   const [edit, setEdit] = useState(null)
+  const [series, setSeries] = useState(false)
   const list = matches.filter((m) => j === 'all' || m.jornada === +j)
 
   async function del(m) {
@@ -111,7 +112,8 @@ function MatchesAdmin() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
         <p className="font-black">Partidos ({matches.length})</p>
         <div className="flex gap-2">
-          <select className="input w-40" value={j} onChange={(e) => setJ(e.target.value)}><option value="all">Todas</option>{js.map((x) => <option key={x} value={x}>Jornada {x}</option>)}</select>
+          <select className="input w-48" value={j} onChange={(e) => setJ(e.target.value)}><option value="all">Todas</option>{js.map((x) => <option key={x} value={x}>{jornadaLabel(x, matches)}</option>)}</select>
+          <button onClick={() => setSeries(true)} className="btn-primary"><Plus className="h-4 w-4" />Serie de liguilla</button>
           <button onClick={() => setEdit({ jornada: js[js.length - 1] || 1, stage: 'groups', status: 'pending' })} className="btn-primary"><Plus className="h-4 w-4" />Partido</button>
         </div>
       </div>
@@ -137,6 +139,9 @@ function MatchesAdmin() {
       </div>
       <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? 'Editar partido' : 'Nuevo partido'}>
         {edit && <MatchForm m={edit} teams={teams} onDone={() => { setEdit(null); loadPublic(); notify('Partido guardado.') }} />}
+      </Modal>
+      <Modal open={series} onClose={() => setSeries(false)} title="Nueva serie de liguilla (ida y vuelta)">
+        {series && <SeriesForm teams={teams} onDone={() => { setSeries(false); loadPublic(); notify('Serie creada: ida y vuelta.') }} />}
       </Modal>
     </div>
   )
@@ -186,6 +191,57 @@ function MatchForm({ m, teams, onDone }) {
       </div>
       {err && <p className="text-xs text-red-300">{err}</p>}
       <button className="btn-primary">Guardar</button>
+    </form>
+  )
+}
+
+/* ---------- Serie de liguilla: crea ida y vuelta de una vez ---------- */
+function SeriesForm({ teams, onDone }) {
+  const [f, setF] = useState({ stage: 'quarter' })
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+  const team = (name) => teams.find((t) => t.name === name)
+
+  async function save(e) {
+    e.preventDefault()
+    const hi = team(f.high), lo = team(f.low)
+    if (!hi || !lo || hi === lo) return setErr('Elige dos equipos distintos.')
+    if (!f.ida || !f.vuelta) return setErr('Escribe la fecha de la ida y de la vuelta.')
+    if (f.vuelta <= f.ida) return setErr('La vuelta debe ser después de la ida.')
+    const [jIda, jVuelta] = LIGUILLA_JORNADAS[f.stage]
+    const row = (local, away, kickoff, jornada, venue) => ({
+      jornada, stage: f.stage, status: 'pending', venue: venue || null,
+      local_team: local.name, local_team_short: local.short_name, local_team_flag: local.flag_url,
+      away_team: away.name, away_team_short: away.short_name, away_team_flag: away.flag_url,
+      kickoff: fromLocalInput(kickoff),
+    })
+    setBusy(true)
+    // Ida en casa del peor posicionado; vuelta en casa del mejor posicionado.
+    const { error } = await supabase.from('matches').insert([
+      row(lo, hi, f.ida, jIda, f.venue_ida),
+      row(hi, lo, f.vuelta, jVuelta, f.venue_vuelta),
+    ])
+    setBusy(false)
+    if (error) return setErr(error.message)
+    onDone()
+  }
+
+  const opts = <><option value="">—</option>{teams.map((t) => <option key={t.id}>{t.name}</option>)}</>
+  return (
+    <form onSubmit={save} className="grid gap-3">
+      <div><label className="label">Fase</label><select className="input" value={f.stage} onChange={set('stage')}>{Object.keys(LIGUILLA_JORNADAS).map((k) => <option key={k} value={k}>{STAGES[k]}</option>)}</select></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="label">Mejor posicionado</label><select className="input" value={f.high || ''} onChange={set('high')}>{opts}</select></div>
+        <div><label className="label">Peor posicionado</label><select className="input" value={f.low || ''} onChange={set('low')}>{opts}</select></div>
+        <div className="col-span-2"><label className="label">Ida (local: {f.low || 'peor posicionado'}) · hora CDMX</label><input className="input" type="datetime-local" value={f.ida || ''} onChange={set('ida')} /></div>
+        <div className="col-span-2"><label className="label">Estadio de la ida (opcional)</label><input className="input" value={f.venue_ida || ''} onChange={set('venue_ida')} /></div>
+        <div className="col-span-2"><label className="label">Vuelta (local: {f.high || 'mejor posicionado'}) · hora CDMX</label><input className="input" type="datetime-local" value={f.vuelta || ''} onChange={set('vuelta')} /></div>
+        <div className="col-span-2"><label className="label">Estadio de la vuelta (opcional)</label><input className="input" value={f.venue_vuelta || ''} onChange={set('venue_vuelta')} /></div>
+      </div>
+      <p className="text-[11px] text-muted-foreground">Se crean 2 partidos (jornadas {LIGUILLA_JORNADAS[f.stage].join(' y ')}). Se pronostican con L/E/V a 90 minutos, igual que la temporada regular.</p>
+      {err && <p className="text-xs text-red-300">{err}</p>}
+      <button className="btn-primary" disabled={busy}>{busy ? 'Creando...' : 'Crear serie'}</button>
     </form>
   )
 }

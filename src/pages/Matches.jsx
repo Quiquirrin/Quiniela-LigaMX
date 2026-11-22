@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search, CalendarDays, Radio, CheckCircle2, Clock, Trophy } from 'lucide-react'
 import { useData } from '../lib/data'
-import { currentJornada, dayKey, fmtDay, isOpen, jornadaRange, matchState } from '../lib/utils'
+import { currentJornada, dayKey, fmtDay, isOpen, jornadaInfo, jornadaRange, matchState } from '../lib/utils'
 import { Countdown, useNow } from '../components/ui'
 import MatchCard from '../components/MatchCard'
 
@@ -16,6 +16,7 @@ export default function Matches() {
   useEffect(() => setSel(cj), [cj])
 
   const jm = matches.filter((m) => m.jornada === sel)
+  const info = jornadaInfo(sel, matches)
   const jStatus = (j) => {
     const ms = matches.filter((m) => m.jornada === j)
     return ms.every((m) => m.status === 'finished') ? 'finished' : 'active'
@@ -33,8 +34,8 @@ export default function Matches() {
     <div className="space-y-5">
       <section className="card grid gap-6 p-6 md:grid-cols-[1fr_300px] md:items-center">
         <div>
-          <span className="chip bg-primary/15 text-primary">Jornada {sel}</span>
-          <h1 className="mt-2 h-title">⚽ Jornada {sel}</h1>
+          <span className="chip bg-primary/15 text-primary">{info.stage === 'groups' ? 'Temporada Regular' : 'Liguilla'}</span>
+          <h1 className="mt-2 h-title">{info.stage === 'groups' ? '⚽' : '🏆'} {info.label}</h1>
           <p className="text-xs font-semibold text-muted-foreground">{jornadaRange(jm)}</p>
           <p className="mt-2 text-sm text-muted-foreground">{jm.length} partidos · Haz tus pronósticos antes de cada partido.</p>
         </div>
@@ -49,8 +50,8 @@ export default function Matches() {
           const s = sel === j, c = cj === j, f = jStatus(j) === 'finished'
           return (
             <button key={j} onClick={() => setSel(j)}
-              className={`w-[68px] flex-shrink-0 rounded-xl border p-2 text-center transition ${s ? 'scale-105 border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:border-primary/50'}`}>
-              <p className="text-sm font-black">J{j}</p>
+              className={`min-w-[68px] flex-shrink-0 rounded-xl border p-2 text-center transition ${s ? 'scale-105 border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:border-primary/50'}`}>
+              <p className="whitespace-nowrap text-sm font-black">{jornadaInfo(j, matches).short}</p>
               <p className={`text-[9px] font-bold uppercase ${s ? '' : f ? 'text-primary' : 'text-muted-foreground'}`}>{c ? 'Actual' : f ? '✓ Final' : 'Próxima'}</p>
             </button>
           )

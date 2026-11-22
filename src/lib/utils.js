@@ -72,3 +72,31 @@ export function streaks(preds, matchesById) {
   for (const ok of seq) { cur = ok ? cur + 1 : 0; best = Math.max(best, cur) }
   return { best, current: cur, last: seq.slice(-5) }
 }
+
+/* ---------- Liguilla (ida y vuelta) ---------- */
+// Jornada numbers used for each knockout stage: [ida, vuelta]
+export const LIGUILLA_JORNADAS = { quarter: [18, 19], semi: [20, 21], final: [22, 23] }
+const STAGE_SHORT = { playin: 'Play-In', quarter: '4tos', semi: 'Semis', final: 'Final' }
+
+/** Stage + leg of a jornada, derived from its matches. Ida = first jornada of that stage. */
+export function jornadaInfo(j, matches) {
+  const stage = matches.find((m) => m.jornada === j)?.stage || 'groups'
+  if (stage === 'groups') return { stage, label: `Jornada ${j}`, short: `J${j}`, tiny: `${j}`, leg: null }
+  const js = [...new Set(matches.filter((m) => m.stage === stage).map((m) => m.jornada))].sort((a, b) => a - b)
+  const fixed = LIGUILLA_JORNADAS[stage]?.indexOf(j)
+  const leg = fixed >= 0 ? (fixed === 0 ? 'Ida' : 'Vuelta') : js.length > 1 ? (j === js[0] ? 'Ida' : 'Vuelta') : null
+  return {
+    stage, leg,
+    label: `${STAGES[stage] || stage}${leg ? ' · ' + leg : ''}`,
+    short: `${STAGE_SHORT[stage] || stage}${leg ? ' ' + (leg === 'Ida' ? 'Ida' : 'Vta') : ''}`,
+    tiny: `${{ playin: 'P', quarter: 'C', semi: 'S', final: 'F' }[stage] || '?'}${leg ? (leg === 'Ida' ? 1 : 2) : ''}`,
+  }
+}
+export const jornadaLabel = (j, matches) => jornadaInfo(j, matches).label
+
+/** For a vuelta match, the ida of the same series (same stage, teams swapped). */
+export function firstLeg(match, matches) {
+  if (match.stage === 'groups') return null
+  return matches.find((m) => m.id !== match.id && m.stage === match.stage && m.jornada < match.jornada
+    && m.local_team === match.away_team && m.away_team === match.local_team) || null
+}

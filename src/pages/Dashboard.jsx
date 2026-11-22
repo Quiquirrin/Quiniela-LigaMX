@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Trophy, Target, TrendingUp, Clock, Send, CalendarDays } from 'lucide-react'
 import { useData } from '../lib/data'
-import { currentJornada, isOpen, jornadaRange } from '../lib/utils'
+import { currentJornada, isOpen, jornadaLabel, jornadaRange } from '../lib/utils'
 import { Avatar, Countdown, StatCard, useNow } from '../components/ui'
 import MatchCard from '../components/MatchCard'
 
@@ -12,7 +12,8 @@ export default function Dashboard() {
   const now = useNow(30000)
   const cj = currentJornada(matches)
   const jm = matches.filter((m) => m.jornada === cj)
-  const total = content?.total_jornadas || 17
+  const total = Math.max(content?.total_jornadas || 17, new Set(matches.map((m) => m.jornada)).size)
+  const cjLabel = jornadaLabel(cj, matches)
   const finishedJ = [...new Set(matches.map((m) => m.jornada))].filter((j) => matches.filter((m) => m.jornada === j).every((m) => m.status === 'finished')).length
   const openMatches = matches.filter((m) => isOpen(m, now))
   const pending = openMatches.filter((m) => !predByMatch[m.id]).length
@@ -29,7 +30,7 @@ export default function Dashboard() {
             <span className="chip bg-primary/15 text-primary">⚡ {content?.tournament_name || 'Torneo'}</span>
             <h1 className="mt-3 text-3xl font-black md:text-4xl">Hola, {name} 👋</h1>
             <p className="mt-1 text-sm text-muted-foreground">Bienvenido al {content?.tournament_name}</p>
-            <p className="mt-3 text-lg font-black text-primary">Jornada {cj}</p>
+            <p className="mt-3 text-lg font-black text-primary">{cjLabel}</p>
             <p className="text-sm text-muted-foreground">Haz tus pronósticos y demuestra que eres el mejor experto.</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <a href="#jornada" className="btn-primary"><Send className="h-4 w-4" />Pronosticar ahora</a>
@@ -38,7 +39,7 @@ export default function Dashboard() {
           </div>
           <div className="rounded-2xl border border-border bg-black/20 p-5">
             <p className="text-[11px] font-bold uppercase text-muted-foreground">Progreso del torneo</p>
-            <p className="mt-1 text-2xl font-black">Jornada {cj} <span className="text-sm text-muted-foreground">de {total}</span></p>
+            <p className="mt-1 text-2xl font-black">{cjLabel} <span className="text-sm text-muted-foreground">de {total}</span></p>
             <div className="mt-3 h-2 rounded-full bg-white/10"><div className="h-2 rounded-full bg-primary" style={{ width: `${Math.min(100, (finishedJ / total) * 100)}%` }} /></div>
             <p className="mt-1 text-[11px] text-muted-foreground">{finishedJ} de {total} jornadas terminadas</p>
           </div>
@@ -56,7 +57,7 @@ export default function Dashboard() {
         <section id="jornada" className="scroll-mt-20">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-black uppercase">Jornada {cj}</h2>
+              <h2 className="text-xl font-black uppercase">{cjLabel}</h2>
               <p className="text-xs text-muted-foreground">{jornadaRange(jm)}</p>
             </div>
             {nextClose && <Countdown target={nextClose} compact />}
